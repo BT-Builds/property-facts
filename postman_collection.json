@@ -1,0 +1,165 @@
+{
+  "info": {
+    "name": "property-facts API",
+    "description": "Get basic property facts (sqft, beds, baths, year, lot size) for any US address",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://property-facts.vercel.app",
+      "type": "string"
+    },
+    {
+      "key": "api_key",
+      "value": "free-demo-key",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/health",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "health"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Lookup Property",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/lookup",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "lookup"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"address\": \"\",\n  \"city\": \"\",\n  \"state\": \"\",\n  \"zip\": \"\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
+      "name": "Get Sqft",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/sqft",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "sqft"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Beds Baths",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/beds-baths",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "beds-baths"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Get Year Built",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/year-built",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "year-built"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -68,3 +68,6 @@ All endpoints except `/health` require `x-api-key` header.
 ## Monetization
 
 List on RapidAPI for $19-29/month team plan.
+
+## Postman
+[![Run in Postman](https://run.pstmn.io/button.svg)](https://raw.githubusercontent.com/BT-Builds/property-facts/main/postman_collection.json)
