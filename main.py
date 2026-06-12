@@ -1,12 +1,15 @@
 from fastapi import FastAPI, HTTPException, Depends, Header
 from pydantic import BaseModel
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 import httpx
 import os
 
 app = FastAPI(
     title="Property Facts API",
-    description="Get basic property facts (sqft, beds, baths, year, lot size)
+    description="Get basic property facts (sqft, beds, baths, year, lot size) for any US address",
+    version="1.0.0"
+)
+
 # === BT Builds Standard Middleware (auto-injected) ===
 from fastapi.middleware.cors import CORSMiddleware as _BTCors
 app.add_middleware(_BTCors, allow_origins=["*"], allow_methods=["*"],
@@ -18,11 +21,10 @@ async def _bt_add_headers(request, call_next):
     response.headers["X-Powered-By"] = "btbuilds"
     response.headers["Access-Control-Allow-Origin"] = "*"
     return response
- for any US address",
-    version="1.0.0"
-)
 
-API_KEY=os.get...sync def verify_api_key(x_api_key: str = Header(None)):
+API_KEY = os.getenv("API_KEY")
+
+async def verify_api_key(x_api_key: str = Header(None)):
     if x_api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Invalid API key")
     return x_api_key
@@ -44,6 +46,23 @@ class PropertyFacts(BaseModel):
     property_type: Optional[str] = None
     source: str = "estated"
 
+class BulkPropertyLookup(BaseModel):
+    items: List[PropertyLookup]
+
+class BulkResult(BaseModel):
+    input: PropertyLookup
+    output: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+def build_full_address(payload: PropertyLookup) -> str:
+    """Build full address string from lookup payload."""
+    address = payload.address
+    if payload.city and payload.state:
+        address = f"{payload.address}, {payload.city}, {payload.state}"
+        if payload.zip:
+            address += f" {payload.zip}"
+    return address
+
 def search_estated(address: str) -> Dict[str, Any]:
     """Search Estated public API for property data."""
     try:
@@ -54,7 +73,7 @@ def search_estated(address: str) -> Dict[str, Any]:
         }
         if not params["token"]:
             return {"error": "API not configured"}
-        
+
         resp = httpx.get(url, params=params, timeout=10.0)
         if resp.status_code == 200:
             return resp.json()
@@ -65,7 +84,7 @@ def search_estated(address: str) -> Dict[str, Any]:
 def extract_property_data(data: Dict) -> PropertyFacts:
     """Extract relevant fields from Estated response."""
     props = data.get("property", {})
-    
+
     sqft = props.get("sqft")
     beds = props.get("beds")
     baths = props.get("baths")
@@ -73,9 +92,9 @@ def extract_property_data(data: Dict) -> PropertyFacts:
     lot_size_sqft = props.get("lot_size_sqft")
     lot_size_acres = lot_size_sqft / 43560 if lot_size_sqft else None
     property_type = props.get("property_type")
-    
+
     address = f"{props.get('address', '')}, {props.get('city', '')}, {props.get('state', '')} {props.get('zip', '')}".strip(", ")
-    
+
     return PropertyFacts(
         address=address or data.get("address", ""),
         sqft=sqft,
@@ -100,14 +119,26 @@ def estimate_property_facts(address: str) -> PropertyFacts:
         property_type="unknown",
         source="estimated"
     )
-    
+
     addr_upper = address.upper()
     if "APT" in addr_upper or "#" in addr_upper:
         result.property_type = "apartment"
     elif "UNIT" in addr_upper:
         result.property_type = "condo"
-    
+
     return result
+
+def process_property_lookup(payload: PropertyLookup) -> Dict[str, Any]:
+    """Process a single property lookup and return results."""
+    address = build_full_address(payload)
+
+    estated_key = os.getenv("ESTATED_API_KEY", "")
+    if estated_key:
+        data = search_estated(address)
+        if "error" not in data:
+            return extract_property_data(data).dict()
+
+    return estimate_property_facts(address).dict()
 
 @app.get("/health")
 async def health():
@@ -115,19 +146,33 @@ async def health():
 
 @app.post("/lookup", dependencies=[Depends(verify_api_key)])
 async def lookup_property(payload: PropertyLookup):
-    address = payload.address
-    if payload.city and payload.state:
-        address = f"{payload.address}, {payload.city}, {payload.state}"
-        if payload.zip:
-            address += f" {payload.zip}"
-    
+    address = build_full_address(payload)
+
     estated_key = os.getenv("ESTATED_API_KEY", "")
     if estated_key:
         data = search_estated(address)
         if "error" not in data:
             return extract_property_data(data)
-    
+
     return estimate_property_facts(address)
+
+@app.post("/bulk/lookup", dependencies=[Depends(verify_api_key)])
+async def bulk_lookup_property(payload: BulkPropertyLookup):
+    if len(payload.items) > 1000:
+        raise HTTPException(status_code=400, detail="Maximum 1000 items per request")
+
+    results = []
+    successful = 0
+
+    for item in payload.items:
+        try:
+            output = process_property_lookup(item)
+            results.append(BulkResult(input=item, output=output).dict())
+            successful += 1
+        except Exception as e:
+            results.append(BulkResult(input=item, error=str(e)).dict())
+
+    return {"results": results, "total": len(payload.items), "successful": successful}
 
 @app.get("/sqft", dependencies=[Depends(verify_api_key)])
 async def get_sqft(address: str, city: str = None, state: str = None, zip: str = None):
@@ -136,16 +181,46 @@ async def get_sqft(address: str, city: str = None, state: str = None, zip: str =
         full_address = f"{address}, {city}, {state}"
         if zip:
             full_address += f" {zip}"
-    
+
     estated_key = os.getenv("ESTATED_API_KEY", "")
     if estated_key:
         data = search_estated(full_address)
         if "error" not in data:
             props = data.get("property", {})
             return {"address": full_address, "sqft": props.get("sqft"), "source": "estated"}
-    
+
     facts = estimate_property_facts(full_address)
     return {"address": full_address, "sqft": facts.sqft, "source": facts.source}
+
+class BulkSqftRequest(BaseModel):
+    items: List[PropertyLookup]
+
+@app.post("/bulk/sqft", dependencies=[Depends(verify_api_key)])
+async def bulk_get_sqft(payload: BulkSqftRequest):
+    if len(payload.items) > 1000:
+        raise HTTPException(status_code=400, detail="Maximum 1000 items per request")
+
+    results = []
+    successful = 0
+
+    for item in payload.items:
+        try:
+            full_address = build_full_address(item)
+            estated_key = os.getenv("ESTATED_API_KEY", "")
+            if estated_key:
+                data = search_estated(full_address)
+                if "error" not in data:
+                    props = data.get("property", {})
+                    results.append(BulkResult(input=item, output={"address": full_address, "sqft": props.get("sqft"), "source": "estated"}).dict())
+                    successful += 1
+                    continue
+            facts = estimate_property_facts(full_address)
+            results.append(BulkResult(input=item, output={"address": full_address, "sqft": facts.sqft, "source": facts.source}).dict())
+            successful += 1
+        except Exception as e:
+            results.append(BulkResult(input=item, error=str(e)).dict())
+
+    return {"results": results, "total": len(payload.items), "successful": successful}
 
 @app.get("/beds-baths", dependencies=[Depends(verify_api_key)])
 async def get_beds_baths(address: str, city: str = None, state: str = None, zip: str = None):
@@ -154,7 +229,7 @@ async def get_beds_baths(address: str, city: str = None, state: str = None, zip:
         full_address = f"{address}, {city}, {state}"
         if zip:
             full_address += f" {zip}"
-    
+
     estated_key = os.getenv("ESTATED_API_KEY", "")
     if estated_key:
         data = search_estated(full_address)
@@ -166,7 +241,7 @@ async def get_beds_baths(address: str, city: str = None, state: str = None, zip:
                 "baths": props.get("baths"),
                 "source": "estated"
             }
-    
+
     facts = estimate_property_facts(full_address)
     return {
         "address": full_address,
@@ -175,6 +250,33 @@ async def get_beds_baths(address: str, city: str = None, state: str = None, zip:
         "source": facts.source
     }
 
+@app.post("/bulk/beds-baths", dependencies=[Depends(verify_api_key)])
+async def bulk_get_beds_baths(payload: BulkSqftRequest):
+    if len(payload.items) > 1000:
+        raise HTTPException(status_code=400, detail="Maximum 1000 items per request")
+
+    results = []
+    successful = 0
+
+    for item in payload.items:
+        try:
+            full_address = build_full_address(item)
+            estated_key = os.getenv("ESTATED_API_KEY", "")
+            if estated_key:
+                data = search_estated(full_address)
+                if "error" not in data:
+                    props = data.get("property", {})
+                    results.append(BulkResult(input=item, output={"address": full_address, "beds": props.get("beds"), "baths": props.get("baths"), "source": "estated"}).dict())
+                    successful += 1
+                    continue
+            facts = estimate_property_facts(full_address)
+            results.append(BulkResult(input=item, output={"address": full_address, "beds": facts.beds, "baths": facts.baths, "source": facts.source}).dict())
+            successful += 1
+        except Exception as e:
+            results.append(BulkResult(input=item, error=str(e)).dict())
+
+    return {"results": results, "total": len(payload.items), "successful": successful}
+
 @app.get("/year-built", dependencies=[Depends(verify_api_key)])
 async def get_year_built(address: str, city: str = None, state: str = None, zip: str = None):
     full_address = address
@@ -182,13 +284,40 @@ async def get_year_built(address: str, city: str = None, state: str = None, zip:
         full_address = f"{address}, {city}, {state}"
         if zip:
             full_address += f" {zip}"
-    
+
     estated_key = os.getenv("ESTATED_API_KEY", "")
     if estated_key:
         data = search_estated(full_address)
         if "error" not in data:
             props = data.get("property", {})
             return {"address": full_address, "year_built": props.get("year_built"), "source": "estated"}
-    
+
     facts = estimate_property_facts(full_address)
     return {"address": full_address, "year_built": facts.year_built, "source": facts.source}
+
+@app.post("/bulk/year-built", dependencies=[Depends(verify_api_key)])
+async def bulk_get_year_built(payload: BulkSqftRequest):
+    if len(payload.items) > 1000:
+        raise HTTPException(status_code=400, detail="Maximum 1000 items per request")
+
+    results = []
+    successful = 0
+
+    for item in payload.items:
+        try:
+            full_address = build_full_address(item)
+            estated_key = os.getenv("ESTATED_API_KEY", "")
+            if estated_key:
+                data = search_estated(full_address)
+                if "error" not in data:
+                    props = data.get("property", {})
+                    results.append(BulkResult(input=item, output={"address": full_address, "year_built": props.get("year_built"), "source": "estated"}).dict())
+                    successful += 1
+                    continue
+            facts = estimate_property_facts(full_address)
+            results.append(BulkResult(input=item, output={"address": full_address, "year_built": facts.year_built, "source": facts.source}).dict())
+            successful += 1
+        except Exception as e:
+            results.append(BulkResult(input=item, error=str(e)).dict())
+
+    return {"results": results, "total": len(payload.items), "successful": successful}
