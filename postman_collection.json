@@ -81,6 +81,43 @@
       }
     },
     {
+      "name": "Bulk Lookup Property",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/bulk/lookup",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "bulk",
+            "lookup"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": 0\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
       "name": "Get Sqft",
       "request": {
         "method": "GET",
@@ -104,6 +141,43 @@
           "path": [
             "sqft"
           ]
+        }
+      }
+    },
+    {
+      "name": "Bulk Get Sqft",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/bulk/sqft",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "bulk",
+            "sqft"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": 0\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       }
     },
@@ -135,6 +209,43 @@
       }
     },
     {
+      "name": "Bulk Get Beds Baths",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/bulk/beds-baths",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "bulk",
+            "beds-baths"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": 0\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      }
+    },
+    {
       "name": "Get Year Built",
       "request": {
         "method": "GET",
@@ -158,6 +269,43 @@
           "path": [
             "year-built"
           ]
+        }
+      }
+    },
+    {
+      "name": "Bulk Get Year Built",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "X-API-Key",
+            "value": "{{api_key}}",
+            "type": "text"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/bulk/year-built",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "bulk",
+            "year-built"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"items\": 0\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       }
     }
